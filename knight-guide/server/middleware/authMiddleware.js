@@ -1,28 +1,24 @@
-import admin from 'firebase-admin';
-import { readFileSync, existsSync } from 'fs';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
 
-// Initialize Firebase Admin (if service account available)
-let firebaseAdmin = null;
+dotenv.config();
 
-const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH || './firebase-service-account.json';
+// Initialize Supabase Client
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 
-if (existsSync(serviceAccountPath)) {
-    try {
-        const serviceAccount = JSON.parse(readFileSync(serviceAccountPath, 'utf8'));
-        firebaseAdmin = admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount)
-        });
-        console.log('Firebase Admin initialized successfully');
-    } catch (error) {
-        console.warn('Firebase Admin initialization failed:', error.message);
-    }
+let supabase = null;
+
+if (supabaseUrl && supabaseAnonKey) {
+    supabase = createClient(supabaseUrl, supabaseAnonKey);
+    console.log('Supabase Client initialized successfully');
 } else {
-    console.warn('Firebase service account not found. Auth middleware will use demo mode.');
+    console.warn('Supabase credentials not found. Auth middleware will use demo mode.');
 }
 
 /**
  * Authentication middleware
- * Verifies Firebase ID tokens for protected routes
+ * Verifies Supabase JWT tokens for protected routes
  */
 export async function authMiddleware(req, res, next) {
     try {
@@ -33,7 +29,7 @@ export async function authMiddleware(req, res, next) {
             // Demo mode: allow requests without auth in development
             if (process.env.NODE_ENV !== 'production') {
                 req.user = {
-                    uid: 'demo-user',
+                    id: 'demo-user',
                     email: 'demo@knight-guide.app',
                     demoMode: true
                 };
@@ -48,20 +44,23 @@ export async function authMiddleware(req, res, next) {
 
         const token = authHeader.split('Bearer ')[1];
 
-        // Verify token with Firebase Admin
-        if (firebaseAdmin) {
-            const decodedToken = await admin.auth().verifyIdToken(token);
+        // Verify token with Supabase
+        if (supabase) {
+            const { data: { user }, error } = await supabase.auth.getUser(token);
+
+            if (error) throw error;
+
             req.user = {
-                uid: decodedToken.uid,
-                email: decodedToken.email,
-                emailVerified: decodedToken.email_verified,
+                id: user.id,
+                email: user.email,
+                emailVerified: user.email_confirmed_at,
                 demoMode: false
             };
         } else {
             // Demo mode fallback
             if (process.env.NODE_ENV !== 'production') {
                 req.user = {
-                    uid: 'demo-user',
+                    id: 'demo-user',
                     email: 'demo@knight-guide.app',
                     demoMode: true
                 };
@@ -77,33 +76,11 @@ export async function authMiddleware(req, res, next) {
     } catch (error) {
         console.error('Auth middleware error:', error);
 
-        if (error.code === 'auth/id-token-expired') {
-            return res.status(401).json({
-                error: 'Token expired',
-                code: 'TOKEN_EXPIRED'
-            });
-        }
-
-        if (error.code === 'auth/invalid-id-token') {
-            return res.status(401).json({
-                error: 'Invalid token',
-                code: 'INVALID_TOKEN'
-            });
-        }
-
-        // Demo mode in development
-        if (process.env.NODE_ENV !== 'production') {
-            req.user = {
-                uid: 'demo-user',
-                email: 'demo@knight-guide.app',
-                demoMode: true
-            };
-            return next();
-        }
-
-        res.status(500).json({
-            error: 'Authentication failed',
-            code: 'AUTH_FAILED'
+        // Map Supabase errors if needed
+        return res.status(401).json({
+            error: 'Invalid token',
+            code: 'INVALID_TOKEN',
+            details: error.message
         });
     }
 }
@@ -115,14 +92,17 @@ export async function optionalAuthMiddleware(req, res, next) {
     try {
         const authHeader = req.headers.authorization;
 
-        if (authHeader && authHeader.startsWith('Bearer ') && firebaseAdmin) {
+        if (authHeader && authHeader.startsWith('Bearer ') && supabase) {
             const token = authHeader.split('Bearer ')[1];
-            const decodedToken = await admin.auth().verifyIdToken(token);
-            req.user = {
-                uid: decodedToken.uid,
-                email: decodedToken.email,
-                demoMode: false
-            };
+            const { data: { user }, error } = await supabase.auth.getUser(token);
+
+            if (!error && user) {
+                req.user = {
+                    id: user.id,
+                    email: user.email,
+                    demoMode: false
+                };
+            }
         }
     } catch (error) {
         // Ignore auth errors for optional auth

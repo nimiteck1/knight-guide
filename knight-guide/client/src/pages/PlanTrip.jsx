@@ -1,0 +1,321 @@
+import React, { useState } from "react";
+import { Link } from "react-router-dom";
+import { supabase } from "../lib/supabaseClient";
+
+// Import components
+import MoodSelector from "../components/plantrip/MoodSelector";
+import LocationCard from "../components/plantrip/LocationCard";
+import DateRange from "../components/plantrip/DateRange";
+import AIOptions from "../components/plantrip/AIOptions";
+import Preferences from "../components/plantrip/Preferences";
+import GenerateButton from "../components/plantrip/GenerateButton";
+import ItineraryResult from "../components/plantrip/ItineraryResult";
+
+/**
+ * PlanTrip Page - Desktop Landscape Layout
+ * Wide horizontal layout optimized for desktop screens
+ */
+const PlanTrip = () => {
+    // Form state
+    const [mood, setMood] = useState("");
+    const [location, setLocation] = useState("");
+    const [radius, setRadius] = useState(5);
+    const [startDate, setStartDate] = useState("");
+    const [endDate, setEndDate] = useState("");
+    const [aiEnabled, setAIEnabled] = useState(true);
+    const [crowd, setCrowd] = useState("");
+    const [preferences, setPreferences] = useState({
+        // Safety & Emergency
+        nearHospitals: false,
+        showNearestHospital: true,
+        emergencyRestStops: false,
+        avoidIsolated: true,
+        hospitalProximity: "5km",
+        // Accessibility & Mobility
+        wheelchairFriendly: false,
+        avoidStairs: false,
+        accessibleRestrooms: false,
+        accessibleParking: false,
+        serviceAnimal: false,
+        strictAccessibility: false,
+        // Route & Navigation
+        avoidCrowded: false,
+        shortestDistance: false,
+        smoothPaths: false,
+        scenicRoutes: true,
+        // Dietary Preferences
+        mealPlan: true,
+        culinary: false,
+        halal: false,
+    });
+    const [loading, setLoading] = useState(false);
+    const [itinerary, setItinerary] = useState(null);
+    const [error, setError] = useState("");
+
+    // Handlers
+    const handlePreferenceChange = (id, checked) => {
+        setPreferences((prev) => ({ ...prev, [id]: checked }));
+    };
+
+    const handleAdjustRadius = () => {
+        const options = [5, 10, 15, 25, 50];
+        const currentIndex = options.indexOf(radius);
+        const nextIndex = (currentIndex + 1) % options.length;
+        setRadius(options[nextIndex]);
+    };
+
+    const handleGeneratePlan = async () => {
+        setLoading(true);
+        setError("");
+        setItinerary(null);
+
+        try {
+            const { data, error: fnError } = await supabase.functions.invoke('generate-itinerary', {
+                body: {
+                    location,
+                    startDate,
+                    endDate,
+                    mood,
+                    radius,
+                    aiEnabled,
+                    crowd,
+                    preferences,
+                },
+            });
+
+            if (fnError) {
+                throw fnError;
+            }
+
+            if (!data?.success) {
+                throw new Error(data?.error || 'Failed to generate itinerary');
+            }
+
+            setItinerary(data.itinerary);
+        } catch (err) {
+            console.error("Error generating itinerary:", err);
+            setError(err.message || "Failed to generate itinerary. Please try again.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleCloseItinerary = () => {
+        setItinerary(null);
+    };
+
+    return (
+        <div className="page" style={{ padding: "2rem 3rem" }}>
+            {/* Header */}
+            <div style={{
+                display: "flex",
+                alignItems: "center",
+                marginBottom: "2rem",
+                maxWidth: "1400px",
+                margin: "0 auto 2rem auto",
+            }}>
+                <Link
+                    to="/"
+                    style={{
+                        padding: "0.5rem 1rem",
+                        color: "var(--color-text-secondary)",
+                        textDecoration: "none",
+                        fontSize: "1.25rem",
+                        marginRight: "1rem",
+                    }}
+                    aria-label="Go back"
+                >
+                    ← Back
+                </Link>
+                <h1 style={{
+                    fontSize: "2rem",
+                    fontWeight: "700",
+                    color: "var(--color-text-primary)",
+                    margin: 0,
+                    background: "var(--gradient-primary)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    backgroundClip: "text",
+                }}>
+                    Create Your Trip Plan
+                </h1>
+            </div>
+
+            {/* Main Grid - Landscape Layout */}
+            <div style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr 1.5fr",
+                gap: "2rem",
+                maxWidth: "1500px",
+                margin: "0 auto",
+                alignItems: "start",
+            }}>
+                {/* Left Column */}
+                <div style={{
+                    background: "var(--color-bg-glass)",
+                    backdropFilter: "blur(20px)",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "var(--radius-xl)",
+                    padding: "1.5rem",
+                }}>
+                    <h2 style={{
+                        fontSize: "1.125rem",
+                        fontWeight: "600",
+                        color: "var(--color-text-primary)",
+                        marginBottom: "1.25rem",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                    }}>
+                        <span>🎯</span> Trip Details
+                    </h2>
+                    <MoodSelector selectedMood={mood} onMoodChange={setMood} />
+                    <LocationCard
+                        location={location}
+                        radius={radius}
+                        onLocationChange={setLocation}
+                        onRadiusChange={setRadius}
+                        onAdjust={handleAdjustRadius}
+                    />
+                </div>
+
+                {/* Center Column */}
+                <div style={{
+                    background: "var(--color-bg-glass)",
+                    backdropFilter: "blur(20px)",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "var(--radius-xl)",
+                    padding: "1.5rem",
+                }}>
+                    <h2 style={{
+                        fontSize: "1.125rem",
+                        fontWeight: "600",
+                        color: "var(--color-text-primary)",
+                        marginBottom: "1.25rem",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                    }}>
+                        <span>📅</span> Schedule
+                    </h2>
+                    <DateRange
+                        startDate={startDate}
+                        endDate={endDate}
+                        onStartDateChange={setStartDate}
+                        onEndDateChange={setEndDate}
+                    />
+                    <AIOptions
+                        aiEnabled={aiEnabled}
+                        selectedCrowd={crowd}
+                        onAIToggle={setAIEnabled}
+                        onCrowdChange={setCrowd}
+                    />
+                </div>
+
+                {/* Right Column - Preferences with scroll */}
+                <div style={{
+                    background: "var(--color-bg-glass)",
+                    backdropFilter: "blur(20px)",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "var(--radius-xl)",
+                    padding: "1.5rem",
+                    display: "flex",
+                    flexDirection: "column",
+                    maxHeight: "calc(100vh - 180px)",
+                }}>
+                    <h2 style={{
+                        fontSize: "1.125rem",
+                        fontWeight: "600",
+                        color: "var(--color-text-primary)",
+                        marginBottom: "1rem",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                        flexShrink: 0,
+                    }}>
+                        <span>⚙️</span> Preferences
+                    </h2>
+                    {/* Scrollable Preferences Container */}
+                    <div style={{
+                        flex: 1,
+                        overflowY: "auto",
+                        paddingRight: "0.5rem",
+                        marginBottom: "1rem",
+                    }}>
+                        <Preferences
+                            preferences={preferences}
+                            onPreferenceChange={handlePreferenceChange}
+                        />
+                    </div>
+                    {/* Sticky Generate Button */}
+                    <div style={{
+                        flexShrink: 0,
+                        paddingTop: "0.75rem",
+                        borderTop: "1px solid var(--color-border)",
+                    }}>
+                        <GenerateButton
+                            onClick={handleGeneratePlan}
+                            disabled={!location || !startDate || !endDate}
+                            loading={loading}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Error Display */}
+            {error && (
+                <div style={{
+                    maxWidth: "1500px",
+                    margin: "2rem auto 0 auto",
+                    padding: "1rem 1.5rem",
+                    background: "rgba(239, 68, 68, 0.1)",
+                    border: "1px solid rgba(239, 68, 68, 0.3)",
+                    borderRadius: "var(--radius-lg)",
+                    color: "#f87171",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.75rem",
+                }}>
+                    <span>⚠️</span>
+                    <span>{error}</span>
+                    <button
+                        onClick={() => setError("")}
+                        style={{
+                            marginLeft: "auto",
+                            background: "transparent",
+                            border: "none",
+                            color: "#f87171",
+                            cursor: "pointer",
+                            fontSize: "1.25rem",
+                        }}
+                    >
+                        ✕
+                    </button>
+                </div>
+            )}
+
+            {/* Itinerary Result */}
+            {itinerary && (
+                <div style={{ maxWidth: "1500px", margin: "0 auto" }}>
+                    <ItineraryResult itinerary={itinerary} onClose={handleCloseItinerary} />
+                </div>
+            )}
+
+            {/* Responsive: Stack on smaller screens */}
+            <style>{`
+        @media (max-width: 1024px) {
+          .page > div:last-child {
+            grid-template-columns: 1fr 1fr !important;
+          }
+        }
+        @media (max-width: 768px) {
+          .page > div:last-child {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      `}</style>
+        </div>
+    );
+};
+
+export default PlanTrip;

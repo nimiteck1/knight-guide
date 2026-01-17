@@ -11,7 +11,7 @@ Knight Guide is a production-ready MVP that enables users with disabilities to p
 ## 🎯 Features
 
 ### ✅ Core Features (MVP)
-- **User Authentication** - Email/password login with Firebase Auth
+- **User Authentication** - Email/password login with Supabase Auth
 - **Accessibility Profile** - Store mobility, vision, hearing, cognitive needs
 - **AI Itinerary Generation** - Personalized trip planning with Gemini AI
 - **Accessibility Score Map** - Color-coded venue markers with Mapbox
@@ -26,6 +26,7 @@ Knight Guide is a production-ready MVP that enables users with disabilities to p
 ### Prerequisites
 - Node.js 18+
 - npm or yarn
+- Supabase CLI (for Edge Functions)
 
 ### Installation
 
@@ -45,10 +46,9 @@ cp .env.example .env
 Edit `.env` with your API keys:
 
 ```env
-# Firebase (get from Firebase Console)
-VITE_FIREBASE_API_KEY=your_key
-VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=your_project_id
+# Supabase (get from Supabase Dashboard)
+VITE_SUPABASE_URL=your_project_url
+VITE_SUPABASE_ANON_KEY=your_anon_key
 
 # Mapbox (get from mapbox.com)
 VITE_MAPBOX_TOKEN=your_mapbox_token
@@ -75,7 +75,7 @@ cd server && npm run dev
 
 1. **Login/Register** → `/login`
    - Create account with email/password
-   - Demo mode works without Firebase config
+   - Demo mode works without Supabase config
 
 2. **Set Up Profile** → `/profile`
    - Select accessibility needs (wheelchair, vision, etc.)
@@ -147,6 +147,8 @@ knight-guide/
 │   │   │   ├── Profile.jsx
 │   │   │   ├── Itinerary.jsx
 │   │   │   └── Map.jsx
+│   │   ├── lib/
+│   │   │   └── supabaseClient.js
 │   │   ├── styles/
 │   │   │   └── accessibility.css
 │   │   └── App.jsx
@@ -166,9 +168,11 @@ knight-guide/
 │   │   └── authMiddleware.js
 │   └── index.js
 │
-├── firebase/
+├── supabase/
 │   └── functions/
-│       └── index.js
+│       ├── process-alert/
+│       ├── cleanup-alerts/
+│       └── user-updates/
 │
 ├── .env.example
 ├── package.json

@@ -211,9 +211,9 @@ const Map = ({ user, db }) => {
               marginTop: "0.75rem",
               fontSize: "0.875rem",
               color: "var(--color-text-secondary)",
+              role: "status",
+              ariaLive: "polite",
             }}
-            role="status"
-            aria-live="polite"
           >
             Showing {filteredLocations.length} of {locations.length} locations
           </p>

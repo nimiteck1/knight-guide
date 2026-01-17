@@ -56,16 +56,30 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Start server
-app.listen(PORT, () => {
-    console.log(`
+// Start server with graceful error handling
+const startServer = (port) => {
+    const server = app.listen(port, () => {
+        console.log(`
 ╔════════════════════════════════════════════════╗
 ║         Knight Guide API Server                ║
 ║        Accessibility-First Travel              ║
 ╠════════════════════════════════════════════════╣
 ║  Status:  ✓ Running                            ║
-║  Port:    ${PORT}                                 ║
+║  Port:    ${port}                                 ║
 ║  Mode:    ${process.env.NODE_ENV || 'development'}                        ║
 ╚════════════════════════════════════════════════╝
-  `);
-});
+    `);
+    });
+
+    server.on('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+            console.log(`Port ${port} is in use, trying port ${port + 1}...`);
+            startServer(port + 1);
+        } else {
+            console.error('Server error:', err);
+            process.exit(1);
+        }
+    });
+};
+
+startServer(PORT);

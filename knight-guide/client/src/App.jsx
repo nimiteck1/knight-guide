@@ -7,9 +7,7 @@ import {
   useLocation,
   Navigate,
 } from "react-router-dom";
-import { initializeApp, getApps } from "firebase/app";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { supabase, isSupabaseConfigured } from "./lib/supabaseClient";
 
 // Styles
 import "./styles/accessibility.css";
@@ -20,7 +18,7 @@ import VoiceReader from "./components/VoiceReader";
 // Pages
 import Login from "./pages/Login";
 import Profile from "./pages/Profile";
-import Itinerary from "./pages/Itinerary";
+import PlanTrip from "./pages/PlanTrip";
 
 import Map from "./pages/Map";
 import VolunteerDashboard from "./pages/VolunteerDashboard";
@@ -28,35 +26,10 @@ import SignLanguage from "./pages/SignLanguage";
 import WellnessDashboard from "./pages/WellnessDashboard";
 import ExplorePackages from "./pages/ExplorePackages";
 
-// Firebase configuration
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-};
-
-// Initialize Firebase (only if not already initialized and config is present)
-let app = null;
-let auth = null;
-let db = null;
-
-if (firebaseConfig.apiKey && getApps().length === 0) {
-  try {
-    app = initializeApp(firebaseConfig);
-    auth = getAuth(app);
-    db = getFirestore(app);
-  } catch (err) {
-    console.warn("Firebase initialization failed:", err);
-  }
-}
-
 /**
  * Navigation Component
  */
-const Navigation = ({ user }) => {
+const Navigation = ({ user, userName }) => {
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -120,13 +93,7 @@ const Navigation = ({ user }) => {
 
         {/* Desktop / Mobile Links Wrapper */}
         <div className={`nav-links ${isMenuOpen ? "open" : ""}`}>
-          <Link
-            to="/profile"
-            className={`nav-link ${isActive("/profile") ? "active" : ""}`}
-            aria-current={isActive("/profile") ? "page" : undefined}
-          >
-            Profile
-          </Link>
+
           <Link
             to="/itinerary"
             className={`nav-link ${isActive("/itinerary") ? "active" : ""}`}
@@ -164,24 +131,100 @@ const Navigation = ({ user }) => {
           </Link>
           <Link
             to="/explore-packages"
-            className={`nav-link ${
-              isActive("/explore-packages") ? "active" : ""
-            }`}
+            className={`nav-link ${isActive("/explore-packages") ? "active" : ""
+              }`}
             aria-current={isActive("/explore-packages") ? "page" : undefined}
           >
             Explore Packages
           </Link>
 
           {user ? (
-            <span
-              style={{
-                padding: "0.5rem 1rem",
-                fontSize: "0.875rem",
-                color: "var(--color-text-secondary)",
-              }}
-            >
-              {user.email}
-            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+              {/* Round Profile Section - Clickable to go to Profile page */}
+              <Link
+                to="/profile"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.75rem",
+                  textDecoration: "none",
+                  padding: "0.5rem",
+                  borderRadius: "var(--radius-md)",
+                  transition: "background 0.2s ease",
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)";
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                }}
+                aria-label="Go to your profile"
+              >
+                {/* Profile Avatar */}
+                <div
+                  style={{
+                    width: "40px",
+                    height: "40px",
+                    borderRadius: "50%",
+                    background: "linear-gradient(135deg, var(--color-primary), var(--color-primary-dark, #6366f1))",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "1rem",
+                    fontWeight: "700",
+                    color: "#fff",
+                    textTransform: "uppercase",
+                    boxShadow: "0 2px 8px rgba(139, 92, 246, 0.3)",
+                    border: "2px solid rgba(255, 255, 255, 0.2)",
+                  }}
+                >
+                  {(userName || user.email || "U").charAt(0)}
+                </div>
+                {/* Name and Email */}
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+                  <span
+                    style={{
+                      fontSize: "0.875rem",
+                      fontWeight: "600",
+                      color: "var(--color-text-primary)",
+                      lineHeight: "1.2",
+                    }}
+                  >
+                    {userName || "User"}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "0.75rem",
+                      color: "var(--color-text-secondary)",
+                      lineHeight: "1.2",
+                    }}
+                  >
+                    {user.email}
+                  </span>
+                </div>
+              </Link>
+              <button
+                onClick={() => supabase.auth.signOut()}
+                style={{
+                  background: "transparent",
+                  border: "1px solid var(--color-border)",
+                  color: "var(--color-text-primary)",
+                  padding: "0.5rem 1rem",
+                  borderRadius: "var(--radius-md)",
+                  cursor: "pointer",
+                  fontSize: "0.875rem",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseOver={(e) => {
+                  e.target.style.background = "rgba(255, 255, 255, 0.1)";
+                }}
+                onMouseOut={(e) => {
+                  e.target.style.background = "transparent";
+                }}
+              >
+                Sign Out
+              </button>
+            </div>
           ) : (
             <Link
               to="/login"
@@ -213,18 +256,13 @@ const Home = () => {
           <h1
             className="hero-title animate-fadeIn"
             style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "1rem",
-              flexWrap: "wrap",
+              display: "block",
+              textAlign: "center",
+              fontSize: "2.5rem",
+              fontWeight: 800,
+              margin: "0.5rem 0",
             }}
           >
-            <img
-              src="/logo.jpg"
-              alt="Knight Guide Logo"
-              style={{ height: "80px", width: "auto" }}
-            />
             Knight Guide
           </h1>
           <p
@@ -601,20 +639,73 @@ const Home = () => {
  */
 function App() {
   const [user, setUser] = useState(null);
+  const [userName, setUserName] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // Listen for auth state changes
+  // Listen for auth state changes and fetch user profile
   useEffect(() => {
-    if (auth) {
-      const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-        setUser(firebaseUser);
-        setLoading(false);
-      });
-      return () => unsubscribe();
-    } else {
+    // If Supabase is not configured, skip auth check and show the app
+    if (!isSupabaseConfigured) {
+      console.warn('Supabase not configured. Running in demo mode without authentication.');
       setLoading(false);
+      return;
     }
+
+    // Check initial session first
+    const checkSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
+
+        if (currentUser) {
+          try {
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("name")
+              .eq("id", currentUser.id)
+              .single();
+            setUserName(profile?.name || "");
+          } catch (e) {
+            console.error("Error fetching profile:", e);
+          }
+        }
+      } catch (e) {
+        console.error("Error checking session:", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkSession();
+
+    // Subscribe to auth changes for future updates
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+
+      // Fetch user's name from profile
+      if (currentUser) {
+        try {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("name")
+            .eq("id", currentUser.id)
+            .single();
+          setUserName(profile?.name || "");
+        } catch (e) {
+          console.error("Error fetching profile:", e);
+        }
+      } else {
+        setUserName("");
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
+
 
   if (loading) {
     return (
@@ -645,18 +736,18 @@ function App() {
         Skip to main content
       </a>
 
-      <Navigation user={user} />
+      <Navigation user={user} userName={userName} />
 
       <main id="main-content">
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login auth={auth} />} />
-          <Route path="/profile" element={<Profile user={user} db={db} />} />
+          <Route path="/login" element={<Login supabase={supabase} />} />
+          <Route path="/profile" element={<Profile user={user} supabase={supabase} />} />
           <Route
             path="/itinerary"
-            element={<Itinerary user={user} db={db} />}
+            element={<PlanTrip />}
           />
-          <Route path="/map" element={<Map user={user} db={db} />} />
+          <Route path="/map" element={<Map user={user} supabase={supabase} />} />
           <Route path="/volunteer" element={<VolunteerDashboard />} />
           <Route path="/sign-language" element={<SignLanguage />} />
           <Route path="/wellness" element={<WellnessDashboard />} />
