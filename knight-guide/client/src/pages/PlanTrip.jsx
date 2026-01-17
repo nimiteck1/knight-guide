@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "../lib/supabaseClient";
+
+// Server API base URL
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3005';
 
 // Import components
 import MoodSelector from "../components/plantrip/MoodSelector";
@@ -121,7 +123,7 @@ const PlanTrip = () => {
         setItinerary(null);
 
         try {
-            // Build user needs context from preferences for the Edge Function
+            // Build user needs context from preferences
             const userNeedsContext = {
                 mobility: {
                     wheelchairAccess: preferences.wheelchairFriendly,
@@ -143,19 +145,22 @@ const PlanTrip = () => {
                 }
             };
 
-            const { data, error: fnError } = await supabase.functions.invoke('generate-itinerary', {
-                body: {
+            // Call local server API (uses Gemini AI)
+            const response = await fetch(`${API_BASE}/api/itinerary/generate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
                     location,
                     startDate,
                     endDate,
                     mood,
                     userNeedsContext,
-                },
+                }),
             });
 
-            if (fnError) {
-                throw fnError;
-            }
+            const data = await response.json();
 
             if (!data?.success) {
                 throw new Error(data?.error || 'Failed to generate itinerary');
@@ -163,8 +168,8 @@ const PlanTrip = () => {
 
             setItinerary(data.itinerary);
         } catch (err) {
-            console.error("Edge function failed, using mock:", err);
-            // Fallback to mock itinerary
+            console.error("API call failed, using client fallback:", err);
+            // Fallback to client-side mock itinerary
             const mockItinerary = generateMockItinerary(location, startDate, endDate, mood, preferences);
             setItinerary(mockItinerary);
         } finally {
