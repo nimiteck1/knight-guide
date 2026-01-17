@@ -651,10 +651,17 @@ function App() {
       return;
     }
 
-    // Check initial session first
+    // Check initial session first with a timeout
     const checkSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        // Add timeout to prevent infinite loading if Supabase is unreachable
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Session check timeout')), 5000)
+        );
+
+        const sessionPromise = supabase.auth.getSession();
+        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
+
         const currentUser = session?.user ?? null;
         setUser(currentUser);
 
@@ -672,6 +679,7 @@ function App() {
         }
       } catch (e) {
         console.error("Error checking session:", e);
+        // Continue loading the app even if session check fails
       } finally {
         setLoading(false);
       }

@@ -297,7 +297,11 @@ const PlanTrip = () => {
             {/* Itinerary Result */}
             {itinerary && (
                 <div style={{ maxWidth: "1500px", margin: "0 auto" }}>
-                    <ItineraryResult itinerary={itinerary} onClose={handleCloseItinerary} />
+                    <ItineraryResult
+                        itinerary={itinerary}
+                        location={location}
+                        onClose={handleCloseItinerary}
+                    />
                 </div>
             )}
 
