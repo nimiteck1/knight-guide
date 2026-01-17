@@ -94,13 +94,25 @@ const Navigation = ({ user, userName }) => {
         {/* Desktop / Mobile Links Wrapper */}
         <div className={`nav-links ${isMenuOpen ? "open" : ""}`}>
 
-          <Link
-            to="/itinerary"
-            className={`nav-link ${isActive("/itinerary") ? "active" : ""}`}
-            aria-current={isActive("/itinerary") ? "page" : undefined}
-          >
-            Plan Trip
-          </Link>
+          {/* These links only show when user is logged in */}
+          {user && (
+            <>
+              <Link
+                to="/itinerary"
+                className={`nav-link ${isActive("/itinerary") ? "active" : ""}`}
+                aria-current={isActive("/itinerary") ? "page" : undefined}
+              >
+                Plan Trip
+              </Link>
+              <Link
+                to="/explore-packages"
+                className={`nav-link ${isActive("/explore-packages") ? "active" : ""}`}
+                aria-current={isActive("/explore-packages") ? "page" : undefined}
+              >
+                Explore Packages
+              </Link>
+            </>
+          )}
           <Link
             to="/map"
             className={`nav-link ${isActive("/map") ? "active" : ""}`}
@@ -128,14 +140,6 @@ const Navigation = ({ user, userName }) => {
             aria-current={isActive("/wellness") ? "page" : undefined}
           >
             Wellness
-          </Link>
-          <Link
-            to="/explore-packages"
-            className={`nav-link ${isActive("/explore-packages") ? "active" : ""
-              }`}
-            aria-current={isActive("/explore-packages") ? "page" : undefined}
-          >
-            Explore Packages
           </Link>
 
           {user ? (
@@ -753,13 +757,16 @@ function App() {
           <Route path="/profile" element={<Profile user={user} supabase={supabase} />} />
           <Route
             path="/itinerary"
-            element={<PlanTrip />}
+            element={user ? <PlanTrip /> : <Navigate to="/login" replace />}
           />
           <Route path="/map" element={<Map user={user} supabase={supabase} />} />
           <Route path="/volunteer" element={<VolunteerDashboard />} />
           <Route path="/sign-language" element={<SignLanguage />} />
           <Route path="/wellness" element={<WellnessDashboard />} />
-          <Route path="/explore-packages" element={<ExplorePackages />} />
+          <Route
+            path="/explore-packages"
+            element={user ? <ExplorePackages /> : <Navigate to="/login" replace />}
+          />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
