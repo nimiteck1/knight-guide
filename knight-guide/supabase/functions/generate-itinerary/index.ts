@@ -1,155 +1,106 @@
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import OpenAI from "https://esm.sh/openai@4.26.0";
+/// <reference lib="deno.ns" />
 
 export const config = {
     verify_jwt: false,
 };
 
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import OpenAI from "https://esm.sh/openai@4.26.0";
+
+const openai = new OpenAI({
+    apiKey: Deno.env.get("OPENAI_API_KEY"),
+});
+
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Headers":
+        "authorization, x-client-info, apikey, content-type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// Fast mock generator for fallback
-function generateMockItinerary(location: string, days: number, mood: string) {
-    const moods: Record<string, string[]> = {
-        nature: ["Park visit", "Nature trail", "Botanical garden"],
-        party: ["Night club", "Rooftop bar", "Live music venue"],
-        beach: ["Beach relaxation", "Water sports", "Sunset cruise"],
-        default: ["Local sightseeing", "Cultural visit", "Food tour"]
-    };
-    const activities = moods[mood] || moods.default;
-
-    return {
-        tripSummary: `A ${mood || "relaxed"} ${days}-day trip to ${location}`,
-        accessibilityNotes: "All venues selected for accessibility features.",
-        days: Array.from({ length: Math.min(days, 5) }, (_, i) => ({
-            day: i + 1,
-            title: `Day ${i + 1}`,
-            activities: [
-                { time: "9:00 AM", activity: activities[0], accessibility: "Accessible" },
-                { time: "1:00 PM", activity: activities[1], accessibility: "Accessible" },
-                { time: "5:00 PM", activity: activities[2], accessibility: "Accessible" },
-            ],
-        })),
-    };
-}
-
-// Timeout wrapper for API calls
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-    return Promise.race([
-        promise,
-        new Promise<T>((_, reject) =>
-            setTimeout(() => reject(new Error("TIMEOUT")), ms)
-        )
-    ]);
-}
-
-serve(async (req) => {
-    console.log("Edge Function called:", req.method, new Date().toISOString());
-    
+serve(async (req: Request) => {
     if (req.method === "OPTIONS") {
         return new Response("ok", { headers: corsHeaders });
     }
 
-    let body: any;
     try {
-        body = await req.json();
-        console.log("Request body received:", { location: body?.location, mood: body?.mood });
-    } catch (e) {
-        console.error("JSON parse error:", e);
-        return new Response(
-            JSON.stringify({ success: false, error: "Invalid JSON body" }),
-            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-    }
+        const body = await req.json();
 
-    const { location, startDate, endDate, mood, preferences } = body;
+        const { location, startDate, endDate, mood, userNeedsContext } = body;
 
-    if (!location || !startDate || !endDate) {
-        return new Response(
-            JSON.stringify({ success: false, error: "Missing required fields" }),
-            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-    }
+        const prompt = `
+You are an accessibility-first travel planner.
 
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const days = Math.min(5, Math.max(1, Math.ceil((end.getTime() - start.getTime()) / 86400000) + 1));
+Generate a detailed itinerary.
 
-    const apiKey = Deno.env.get("OPENAI_API_KEY");
-    console.log("API Key available:", !!apiKey);
-    
-    if (!apiKey) {
-        console.log("No API key, returning mock data");
-        const mockData = generateMockItinerary(location, days, mood);
-        return new Response(
-            JSON.stringify({ success: true, itinerary: mockData, isMock: true }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-    }
+Location: ${location}
+Dates: ${startDate} to ${endDate}
+Mood: ${mood}
 
-    try {
-        const openai = new OpenAI({ apiKey });
+Accessibility needs:
+${JSON.stringify(userNeedsContext, null, 2)}
 
-        // Build compact accessibility string
-        const access: string[] = [];
-        if (preferences?.wheelchairFriendly) access.push("wheelchair");
-        if (preferences?.avoidStairs) access.push("no stairs");
-
-        // Ultra-compact prompt for speed
-        const prompt = `${days}-day ${location} trip, ${mood || "relaxed"} vibe${access.length ? `, needs: ${access.join(",")}` : ""}.
-Return JSON: {"tripSummary":"..","accessibilityNotes":"..","days":[{"day":1,"title":"..","activities":[{"time":"9AM","activity":"..","accessibility":".."}]}]}
-3 activities/day. JSON only, no markdown.`;
-
-        const completion = await withTimeout(
-            openai.chat.completions.create({
-                model: "gpt-4o-mini",
-                messages: [
-                    { role: "system", content: "Travel planner. JSON only. Be concise." },
-                    { role: "user", content: prompt },
-                ],
-                temperature: 0.7,
-                max_tokens: 800,
-            }),
-            12000 // 12 second timeout
-        );
-
-        let text = completion.choices[0]?.message?.content;
-        if (!text) throw new Error("No AI response");
-
-        text = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-
-        let itinerary;
-        try {
-            itinerary = JSON.parse(text);
-        } catch {
-            console.error("Parse failed:", text.substring(0, 200));
-            throw new Error("Invalid response format");
+Return ONLY valid JSON in this format:
+{
+  "tripSummary": string,
+  "accessibilityNotes": string,
+  "days": [
+    {
+      "day": number,
+      "title": string,
+      "activities": [
+        {
+          "time": string,
+          "activity": string,
+          "accessibility": string
         }
+      ]
+    }
+  ]
+}
+`;
+
+        const completion = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+                { role: "system", content: "You generate accessible travel itineraries." },
+                { role: "user", content: prompt },
+            ],
+            temperature: 0.6,
+        });
+
+        let text = completion.choices[0].message.content || "";
+
+        text = text.replace(/```json|```/g, "").trim();
+
+        const itinerary = JSON.parse(text);
 
         return new Response(
             JSON.stringify({ success: true, itinerary }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            {
+                headers: {
+                    ...corsHeaders,
+                    "Content-Type": "application/json",
+                },
+            }
         );
     } catch (err: unknown) {
-        const errorMessage = err instanceof Error ? err.message : "Generation failed";
+        console.error("EDGE ERROR:", err);
 
-        // On timeout, return mock instead of error
-        if (errorMessage === "TIMEOUT") {
-            console.warn("API timeout, returning mock");
-            return new Response(
-                JSON.stringify({ success: true, itinerary: generateMockItinerary(location, days, mood), isMock: true }),
-                { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
-        }
+        const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
 
-        console.error("Error:", errorMessage);
         return new Response(
-            JSON.stringify({ success: false, error: errorMessage }),
-            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            JSON.stringify({
+                success: false,
+                error: errorMessage,
+            }),
+            {
+                status: 500,
+                headers: {
+                    ...corsHeaders,
+                    "Content-Type": "application/json",
+                },
+            }
         );
     }
 });
-

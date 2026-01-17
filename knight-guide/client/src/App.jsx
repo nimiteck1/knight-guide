@@ -5,6 +5,7 @@ import {
   Route,
   Link,
   useLocation,
+  useNavigate,
   Navigate,
 } from "react-router-dom";
 import { supabase, isSupabaseConfigured } from "./lib/supabaseClient";
@@ -31,6 +32,7 @@ import ExplorePackages from "./pages/ExplorePackages";
  */
 const Navigation = ({ user, userName }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Close menu when route changes
@@ -208,7 +210,10 @@ const Navigation = ({ user, userName }) => {
                 </div>
               </Link>
               <button
-                onClick={() => supabase.auth.signOut()}
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  navigate('/login');
+                }}
                 style={{
                   background: "transparent",
                   border: "1px solid var(--color-border)",

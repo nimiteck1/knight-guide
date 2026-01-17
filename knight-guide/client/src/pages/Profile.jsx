@@ -14,21 +14,7 @@ import { supabase } from "../lib/supabaseClient";
 const Profile = ({ user }) => {
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!user) {
-      navigate("/login");
-    }
-  }, [user, navigate]);
-
-  if (!user) {
-    return (
-      <div className="page">
-        <div className="container" style={{ textAlign: "center", paddingTop: "3rem" }}>
-          <p>Redirecting to login…</p>
-        </div>
-      </div>
-    );
-  }
+  // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -61,28 +47,55 @@ const Profile = ({ user }) => {
     { id: "service-animal", label: "Service Animal" },
   ];
 
+  // Redirect if no user
+  useEffect(() => {
+    if (!user) {
+      navigate("/login");
+    }
+  }, [user, navigate]);
+
   // LOAD PROFILE
   // LOAD PROFILE
   useEffect(() => {
     let mounted = true;
 
     const loadProfile = async () => {
-      // 🔒 Check session
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session?.user) {
-        // Not logged in, let parent/auth listener handle redirect or show check message
-        return;
-      }
-
-      setLoading(true);
-      const currentUser = sessionData.session.user;
-
       try {
-        const { data, error } = await supabase
+        // Add timeout to prevent infinite loading
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Profile load timeout')), 8000)
+        );
+
+        const sessionPromise = supabase.auth.getSession();
+        const { data: sessionData, error: sessionError } = await Promise.race([
+          sessionPromise,
+          timeoutPromise
+        ]);
+
+        if (sessionError) {
+          console.error("Session error:", sessionError);
+          if (mounted) setLoading(false);
+          return;
+        }
+
+        if (!sessionData.session?.user) {
+          // Not logged in, let parent/auth listener handle redirect
+          if (mounted) setLoading(false);
+          return;
+        }
+
+        const currentUser = sessionData.session.user;
+
+        const profilePromise = supabase
           .from("profiles")
           .select("*")
           .eq("id", currentUser.id)
           .single();
+
+        const { data, error } = await Promise.race([
+          profilePromise,
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Profile fetch timeout')), 8000))
+        ]);
 
         if (error && error.code !== "PGRST116") {
           // Real error (not just empty result)
@@ -104,7 +117,7 @@ const Profile = ({ user }) => {
     return () => {
       mounted = false;
     };
-  }, [navigate]); // Removed 'user' dependency to rely on getSession for "fresh" check
+  }, [user]); // Added user dependency to reload when user changes
 
   const handleChange = (field, value) => {
     setProfile((prev) => ({ ...prev, [field]: value }));
@@ -165,6 +178,16 @@ const Profile = ({ user }) => {
     );
   }
 
+  // If user is null (and not loading), show redirect message
+  if (!user) {
+    return (
+      <div className="page">
+        <div className="container" style={{ textAlign: "center", paddingTop: "3rem" }}>
+          <p>Redirecting to login…</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page">

@@ -167,6 +167,9 @@ const WellnessDashboard = () => {
     }
   };
 
+  // Helper function for clamping values
+  const textClamp = (val, min, max) => Math.min(Math.max(val, min), max);
+
   // Simulation Effect
   useEffect(() => {
     let interval;
@@ -176,7 +179,7 @@ const WellnessDashboard = () => {
           // Fluctuate Heart Rate
           const newHr = textClamp(
             prev.heartRate.value +
-              (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 3),
+            (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 3),
             60,
             95
           );
@@ -184,13 +187,13 @@ const WellnessDashboard = () => {
           // Fluctuate BP
           const newSys = textClamp(
             prev.bloodPressure.systolic +
-              (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 2),
+            (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 2),
             110,
             130
           );
           const newDia = textClamp(
             prev.bloodPressure.diastolic +
-              (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 2),
+            (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 2),
             70,
             85
           );
@@ -237,8 +240,6 @@ const WellnessDashboard = () => {
     }
     return () => clearInterval(interval);
   }, [isSimulating]);
-
-  const textClamp = (val, min, max) => Math.min(Math.max(val, min), max);
 
   // Helper for status color
   const getStatusColor = (status) => {
@@ -591,11 +592,11 @@ const WellnessDashboard = () => {
                 <span style={{ fontSize: "1.5rem", fontWeight: "bold" }}>
                   {simulationHistory.length > 0
                     ? Math.round(
-                        simulationHistory.reduce(
-                          (sum, h) => sum + h.heartRate,
-                          0
-                        ) / simulationHistory.length
-                      )
+                      simulationHistory.reduce(
+                        (sum, h) => sum + h.heartRate,
+                        0
+                      ) / simulationHistory.length
+                    )
                     : 72}{" "}
                   bpm
                 </span>
@@ -612,7 +613,7 @@ const WellnessDashboard = () => {
                 <span style={{ fontSize: "1.5rem", fontWeight: "bold" }}>
                   {simulationHistory.length > 0
                     ? simulationHistory[simulationHistory.length - 1].steps -
-                      simulationHistory[0].steps
+                    simulationHistory[0].steps
                     : 0}
                 </span>
               </div>

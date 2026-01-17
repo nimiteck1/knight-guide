@@ -1,15 +1,16 @@
+/// <reference lib="deno.ns" />
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
-serve(async (req) => {
+serve(async (_req: Request) => {
     const supabaseClient = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '' // Use Service Role Key for admin tasks
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
     const cutoffDate = new Date()
-    cutoffDate.setDate(cutoffDate.getDate() - 90) // 90 days retention
+    cutoffDate.setDate(cutoffDate.getDate() - 90)
 
     try {
         const { error, count } = await supabaseClient
@@ -25,10 +26,11 @@ serve(async (req) => {
             JSON.stringify({ success: true, deletedCount: count }),
             { headers: { "Content-Type": "application/json" } },
         )
-    } catch (error) {
+    } catch (error: unknown) {
         console.error('Error cleaning up alerts:', error)
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
         return new Response(
-            JSON.stringify({ error: error.message }),
+            JSON.stringify({ error: errorMessage }),
             { status: 500, headers: { "Content-Type": "application/json" } },
         )
     }

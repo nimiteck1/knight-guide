@@ -1,27 +1,23 @@
+/// <reference lib="deno.ns" />
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 console.log("Hello from Functions!")
 
-serve(async (req) => {
+serve(async (req: Request) => {
     const { record } = await req.json()
 
-    // Create a Supabase client with the Auth context of the logged in user.
     const supabaseClient = createClient(
-        // Supabase API URL - env var exported by default.
         Deno.env.get('SUPABASE_URL') ?? '',
-        // Supabase API ANON KEY - env var exported by default.
         Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-        // Create client with Auth context of the user that called the function.
-        { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+        { global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } } }
     )
 
     const alertId = record.id
     console.log(`Processing emergency alert: ${alertId}`)
 
     try {
-        // 1. Get user profile for additional context
         let userProfile = null
         if (record.user_id) {
             const { data, error } = await supabaseClient
@@ -35,7 +31,6 @@ serve(async (req) => {
             }
         }
 
-        // 2. Log processing
         console.log('Alert details:', {
             alertId,
             userId: record.user_id,
@@ -43,9 +38,6 @@ serve(async (req) => {
             timestamp: record.created_at
         })
 
-        // 3. Update alert status
-        // Note: In a real trigger scenario, be careful of infinite loops if this update triggers the function again.
-        // Ideally, check if status is already 'processed' at the start.
         if (record.status !== 'processed') {
             await supabaseClient
                 .from('emergency_alerts')
@@ -57,18 +49,15 @@ serve(async (req) => {
                 .eq('id', alertId)
         }
 
-        // 4. In production: Trigger actual notifications
-        // - Send SMS via Twilio
-        // - Send push notifications
-
         return new Response(
             JSON.stringify({ success: true, alertId }),
             { headers: { "Content-Type": "application/json" } },
         )
-    } catch (error) {
+    } catch (error: unknown) {
         console.error('Error processing emergency alert:', error)
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
         return new Response(
-            JSON.stringify({ error: error.message }),
+            JSON.stringify({ error: errorMessage }),
             { status: 500, headers: { "Content-Type": "application/json" } },
         )
     }
