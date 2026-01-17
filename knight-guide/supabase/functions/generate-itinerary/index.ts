@@ -1,9 +1,9 @@
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import OpenAI from "https://esm.sh/openai@4.26.0";
+
 export const config = {
     verify_jwt: false,
 };
-
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import OpenAI from "https://esm.sh/openai@4.26.0";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
