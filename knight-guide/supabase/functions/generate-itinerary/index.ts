@@ -47,6 +47,8 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 }
 
 serve(async (req) => {
+    console.log("Edge Function called:", req.method, new Date().toISOString());
+    
     if (req.method === "OPTIONS") {
         return new Response("ok", { headers: corsHeaders });
     }
@@ -54,7 +56,9 @@ serve(async (req) => {
     let body: any;
     try {
         body = await req.json();
-    } catch {
+        console.log("Request body received:", { location: body?.location, mood: body?.mood });
+    } catch (e) {
+        console.error("JSON parse error:", e);
         return new Response(
             JSON.stringify({ success: false, error: "Invalid JSON body" }),
             { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -75,9 +79,13 @@ serve(async (req) => {
     const days = Math.min(5, Math.max(1, Math.ceil((end.getTime() - start.getTime()) / 86400000) + 1));
 
     const apiKey = Deno.env.get("OPENAI_API_KEY");
+    console.log("API Key available:", !!apiKey);
+    
     if (!apiKey) {
+        console.log("No API key, returning mock data");
+        const mockData = generateMockItinerary(location, days, mood);
         return new Response(
-            JSON.stringify({ success: true, itinerary: generateMockItinerary(location, days, mood), isMock: true }),
+            JSON.stringify({ success: true, itinerary: mockData, isMock: true }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
@@ -144,3 +152,4 @@ Return JSON: {"tripSummary":"..","accessibilityNotes":"..","days":[{"day":1,"tit
         );
     }
 });
+
